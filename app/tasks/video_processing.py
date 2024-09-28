@@ -8,8 +8,6 @@ import os
 
 @celery.task(bind=True)
 def process_video_task(self, audio_path, character_name, video_id):
-    os.makedirs('static', exist_ok=True)
-
     audio_clip = AudioFileClip(audio_path)
     audio_duration = audio_clip.duration
     
@@ -19,19 +17,21 @@ def process_video_task(self, audio_path, character_name, video_id):
     temp_video_path = os.path.join('temp', f'{character_name}_temp.mp4')
     video_clip.write_videofile(temp_video_path)
     
-    save_path = os.path.join('static', f'{character_name}_output.mp4')
+    # 修改這裡：只保存文件名，不包含完整路徑
+    output_filename = f'{video_id}.mp4'
+    save_path = os.path.join('app/static', output_filename)
     
     # 將相對路徑轉換為絕對路徑
     audio_path = os.path.abspath(audio_path)
     temp_video_path = os.path.abspath(os.path.join('temp', f'{character_name}_temp.mp4'))
-    save_path = os.path.abspath(os.path.join('static', f'{video_id}_output.mp4'))
+    absolute_save_path = os.path.abspath(save_path)
     
     try:
-        result = sync_lip(audio_path, temp_video_path, save_path)
+        result = sync_lip(audio_path, temp_video_path, absolute_save_path)
         if result['status'] == 'success':
             video = Video.query.get(video_id)
             if video:
-                video.video_url = save_path
+                video.video_url = f'/static/{output_filename}'
                 db.session.commit()
             return {'status': '成功', 'video_id': video_id}
         else:
